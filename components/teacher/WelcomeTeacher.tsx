@@ -1,8 +1,22 @@
 import Feather from "@expo/vector-icons/Feather";
 import { View, Text } from "react-native";
 import Badge from "../badge";
+import { useRouter } from "expo-router";
+import { useContext, useEffect, useState } from "react";
+import { AuthContext } from "@/context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function WelcomeTeacher() {
+  const [currentClass, setCurrentClass] = useState<string | null>(null);
+  useEffect(() => {
+    const init = async () => {
+      const teacherinfo = (await AsyncStorage.getItem("@teacher_info")) || "";
+      const className = JSON.parse(teacherinfo).class || null;
+      setCurrentClass(className);
+    };
+
+    init();
+  }, []);
   return (
     <View className="bg-primary rounded-b-3xl p-3 py-5">
       <View className="bg-white/10 absolute top-4 right-4 backdrop-blur-sm rounded-full p-3">
@@ -15,7 +29,7 @@ export default function WelcomeTeacher() {
       <View className="bg-white/10 rounded-xl p-3 my-5 relative">
         <Text className="text-white text-lg">Your assigned class</Text>
         <View className="my-4">
-          <Badge value="7th B" />
+          {currentClass && <Badge value={currentClass} />}
         </View>
         <View className="rounded-full self-start p-3 bg-white/20 absolute top-4 right-4">
           <Feather name="users" size={24} color="white" />

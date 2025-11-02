@@ -1,7 +1,7 @@
 import WelcomeTeacher from "@/components/teacher/WelcomeTeacher";
 import Today from "@/components/Today";
 import Feather from "@expo/vector-icons/Feather";
-import { Link, RelativePathString } from "expo-router";
+import { Link, RelativePathString, useRouter } from "expo-router";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 

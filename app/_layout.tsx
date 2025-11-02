@@ -6,15 +6,10 @@ import { useEffect } from "react";
 import "react-native-reanimated";
 import "./globals.css";
 import { StatusBar } from "react-native";
+import { UserProvider } from "@/context/AuthContext";
 
 export { ErrorBoundary } from "expo-router";
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: "(tabs)",
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -23,7 +18,6 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -41,16 +35,18 @@ export default function RootLayout() {
 }
 function RootLayoutNav() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <UserProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      <Stack.Screen name="(teacher)" options={{ headerShown: false }} />
-      <Stack.Screen name="(principal)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
-    </Stack>
+        <Stack.Screen name="(principal)" options={{ headerShown: false }} />
+        <Stack.Screen name="(teacher)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)/sign-in" options={{ headerShown: false }} />
+      </Stack>
+    </UserProvider>
   );
 }
