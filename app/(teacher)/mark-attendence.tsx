@@ -1,4 +1,12 @@
 import Today from "@/components/Today";
+import { useAttendance } from "@/context/AttendenceContext";
+import { useTeacher } from "@/context/TeacherContext";
+import {
+  getAttendance,
+  getAttendanceSummary,
+  markAttendance,
+  submitAttendance,
+} from "@/services/attendenceServices";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -9,41 +17,87 @@ import {
   TextInput,
   FlatList,
   Switch,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type AttendanceStatus = "present" | "absent";
-
-interface Student {
-  id: string;
-  name: string;
-  status: AttendanceStatus;
-}
-
-const students7B: Student[] = [
-  { id: "7B-01", name: "Ayaan Khan", status: "present" },
-  { id: "7B-02", name: "Zara Patel", status: "present" },
-  { id: "7B-03", name: "Ishaan Mehta", status: "absent" },
-  { id: "7B-04", name: "Riya Sharma", status: "present" },
-  { id: "7B-05", name: "Arnav Das", status: "present" },
-  { id: "7B-06", name: "Meera Joshi", status: "absent" },
-  { id: "7B-07", name: "Kabir Singh", status: "present" },
-  { id: "7B-08", name: "Anaya Gupta", status: "present" },
-  { id: "7B-09", name: "Vivaan Nair", status: "present" },
-  { id: "7B-10", name: "Diya Reddy", status: "absent" },
-];
-
 export default function MarkAttendanceScreen() {
   const router = useRouter();
-  const [students, setStudents] = useState<Student[]>(students7B);
+  const {
+    students: initialStudents,
+    studentCount: total,
+    assignedClass,
+  } = useTeacher();
+
+  const { refreshAttendance } = useAttendance();
+
+  const [attendanceTaken, setAttendanceTaken] = useState(false);
+  const [checkingIfAttendanceTaken, setCheckingIfAttendanceTaken] =
+    useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [students, setStudents] = useState<AttendenceStudent[]>(
+    initialStudents.map((s) => ({
+      ...s,
+      status: "present",
+      date: new Date().toISOString().split("T")[0], // yyyy-mm-dd
+    })),
+  );
+  const handleSubmitAttendance = async () => {
+    try {
+      if (students.length === 0) {
+        alert("No students to submit!");
+        return;
+      }
+
+      setSubmitting(true);
+      await markAttendance(assignedClass!, students);
+      await refreshAttendance();
+      alert("Attendance submitted successfully!");
+
+      router.replace("/");
+      // Reset all statuses
+      setStudents((prev) => prev.map((s) => ({ ...s, status: "present" })));
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to submit attendance: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkTodayAttendance = async () => {
+      if (!assignedClass) return;
+      try {
+        const todayDate = new Date();
+        const summary = await getAttendanceSummary(assignedClass, todayDate);
+        setAttendanceTaken(summary.total > 0);
+      } catch (err) {
+        console.error("Failed to check today's attendance:", err);
+      } finally {
+        setCheckingIfAttendanceTaken(false);
+      }
+    };
+    checkTodayAttendance();
+  }, [assignedClass]);
 
   const filteredStudents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return query.length === 0
       ? students
-      : students.filter((s) => s.name.toLowerCase().includes(query));
+      : students.filter(
+          (s) =>
+            s.name.toLowerCase().includes(query) ||
+            s.fathername.toLowerCase().includes(query),
+        );
   }, [searchQuery, students]);
+
+  const { present, absent } = useMemo(() => {
+    const presentCount = students.filter((s) => s.status === "present").length;
+    return { present: presentCount, absent: total - presentCount };
+  }, [students, total]);
 
   const toggleAttendance = (id: string) => {
     setStudents((prev) =>
@@ -54,14 +108,13 @@ export default function MarkAttendanceScreen() {
       ),
     );
   };
-
-  const total = students.length;
-  const present = students.filter((s) => s.status === "present").length;
-  const absent = total - present;
+  const currentHour = new Date().getHours();
+  const attendanceEnabled = currentHour >= 7 && currentHour < 23;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       <View className="bg-primary px-5 gap-5 py-3">
+        {/* Header */}
         <View className="flex-row gap-3 items-center py-5">
           <Pressable
             className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
@@ -73,10 +126,13 @@ export default function MarkAttendanceScreen() {
             <Text className="text-2xl font-bold text-white">
               Mark Attendance
             </Text>
-            <Text className="opacity-70 text-white px-1">Class 7th B</Text>
+            <Text className="opacity-70 text-white px-1">
+              Class: {assignedClass}
+            </Text>
           </View>
         </View>
 
+        {/* Summary Cards */}
         <View className="flex-row justify-center gap-3 items-center">
           <Card title="Total" value={total} />
           <Card title="Present" value={present} />
@@ -85,6 +141,7 @@ export default function MarkAttendanceScreen() {
 
         <Today />
 
+        {/* Search */}
         <View className="bg-white rounded-xl flex-row h-[45px] px-3 gap-2 items-center">
           <Feather name="search" size={22} color="gray" />
           <TextInput
@@ -97,16 +154,56 @@ export default function MarkAttendanceScreen() {
         </View>
       </View>
 
+      {/* Student List */}
       <View className="flex-1 px-5 gap-5 py-3">
-        <FlatList
-          showsVerticalScrollIndicator={false}
-          data={filteredStudents}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <StudentItem item={item} onToggle={toggleAttendance} />
+        {!attendanceEnabled ? (
+          <Text className="text-red-800 font-semibold text-center mt-4">
+            Attendance can only be marked between 7 AM and 2 PM
+          </Text>
+        ) : (
+          <FlatList
+            showsVerticalScrollIndicator={false}
+            data={filteredStudents}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <StudentItem item={item} onToggle={toggleAttendance} />
+            )}
+            ItemSeparatorComponent={() => <View className="h-3" />}
+          />
+        )}
+      </View>
+
+      {/* Submit Button */}
+      <View className="px-5 py-3">
+        <Pressable
+          disabled={
+            !attendanceEnabled ||
+            checkingIfAttendanceTaken ||
+            submitting ||
+            attendanceTaken
+          }
+          onPress={handleSubmitAttendance}
+          className={`rounded-2xl p-3 items-center justify-center ${
+            !checkingIfAttendanceTaken &&
+            attendanceEnabled &&
+            !submitting &&
+            !attendanceTaken
+              ? "bg-primary"
+              : "bg-gray-400"
+          }`}
+        >
+          {submitting || checkingIfAttendanceTaken ? (
+            <ActivityIndicator color="#fff" />
+          ) : attendanceTaken ? (
+            <Text className="text-lg font-semibold text-white">
+              Attendance already submitted today
+            </Text>
+          ) : (
+            <Text className="text-lg font-semibold text-white">
+              Submit Attendance({present} Present, {absent} Absent)
+            </Text>
           )}
-          ItemSeparatorComponent={() => <View className="h-3" />}
-        />
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -127,7 +224,7 @@ function StudentItem({
   item,
   onToggle,
 }: {
-  item: Student;
+  item: AttendenceStudent;
   onToggle: (id: string) => void;
 }) {
   const isPresent = item.status === "present";
@@ -141,7 +238,7 @@ function StudentItem({
         >
           {item.name}
         </Text>
-        <Text className="text-gray-500">{item.id}</Text>
+        <Text className="text-gray-500">{item.fathername}</Text>
       </View>
 
       <View className="flex-row gap-3 justify-center items-center">

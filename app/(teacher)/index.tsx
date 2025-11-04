@@ -1,11 +1,19 @@
+import LogoutButton from "@/components/LogoutButton";
 import WelcomeTeacher from "@/components/teacher/WelcomeTeacher";
 import Today from "@/components/Today";
+import { useAttendance } from "@/context/AttendenceContext";
+import { useTeacher } from "@/context/TeacherContext";
 import Feather from "@expo/vector-icons/Feather";
 import { Link, RelativePathString, useRouter } from "expo-router";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function TeacherHome() {
+  const { studentCount } = useTeacher();
+  const { presentCount, absentCount, loading, todayRecord } = useAttendance();
+
+  const attendanceTaken = todayRecord.length > 0;
+
   return (
     <SafeAreaView>
       <ScrollView>
@@ -13,7 +21,8 @@ export default function TeacherHome() {
           <WelcomeTeacher />
           <View className="px-3 gap-3 ">
             <Today color="black" />
-            <View className="flex-row gap-3 items-center p-2  my-3 justify-center">
+
+            <View className="flex-row gap-3 items-center p-2 my-3 justify-center">
               <View className="flex-1">
                 <Card
                   icon={
@@ -21,7 +30,13 @@ export default function TeacherHome() {
                   }
                   icon_bg_color="bg-green-100"
                   title="Present"
-                  value="40 Students"
+                  value={
+                    loading
+                      ? "Loading..."
+                      : attendanceTaken
+                        ? `${presentCount} Students`
+                        : "Not Taken"
+                  }
                 />
               </View>
               <View className="flex-1">
@@ -29,10 +44,17 @@ export default function TeacherHome() {
                   icon={<Feather name="users" size={20} color={"red"} />}
                   icon_bg_color="bg-red-100"
                   title="Absent"
-                  value="2 Students"
+                  value={
+                    loading
+                      ? "Loading..."
+                      : attendanceTaken
+                        ? `${absentCount} Students`
+                        : "Not Taken"
+                  }
                 />
               </View>
             </View>
+
             <View>
               <Text className="text-xl">Quick Actions</Text>
               <QuickActionBar
@@ -60,12 +82,14 @@ export default function TeacherHome() {
                 icon={<Feather name="calendar" size={20} color={"purple"} />}
               />
             </View>
+            <LogoutButton />
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 interface CardProps {
   icon: React.ReactNode;
   icon_bg_color: string;

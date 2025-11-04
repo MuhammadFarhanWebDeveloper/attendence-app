@@ -1,3 +1,4 @@
+import LogoutButton from "@/components/LogoutButton";
 import QuickActions from "@/components/principal/QuickActions";
 import WelcomePrincipal from "@/components/principal/WelcomePrincipal";
 import { View, Text, ScrollView } from "react-native";
@@ -10,6 +11,7 @@ export default function Index() {
         <View className="gap-4">
           <WelcomePrincipal />
           <QuickActions />
+          <LogoutButton />
         </View>
       </ScrollView>
     </SafeAreaView>

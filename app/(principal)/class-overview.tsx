@@ -1,74 +1,127 @@
-import Header from "@/components/Header";
-import { View, Text, FlatList } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Feather from "@expo/vector-icons/Feather";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { usePrincipal } from "@/context/PrincipalContext";
+import { getAttendanceSummary } from "@/services/attendenceServices";
+import Header from "@/components/Header";
+import { getStudentCount } from "@/services/classCache";
 
-type ClassInfo = {
+type ClassSummary = {
   className: string;
-  teacherName: string;
+  teacherName?: string;
   totalStudents: number;
   present: number;
   absents: number;
-  attendance: number; // percentage
+  attendance: number;
 };
 
-const classes: ClassInfo[] = [
-  {
-    className: "7th B",
-    teacherName: "Mr. Ahmed Khan",
-    totalStudents: 30,
-    present: 28,
-    absents: 2,
-    attendance: 93.3,
-  },
-  {
-    className: "8th A",
-    teacherName: "Ms. Sara Malik",
-    totalStudents: 32,
-    present: 30,
-    absents: 2,
-    attendance: 93.8,
-  },
-  {
-    className: "9th C",
-    teacherName: "Mr. Bilal Qureshi",
-    totalStudents: 28,
-    present: 25,
-    absents: 3,
-    attendance: 89.3,
-  },
-  {
-    className: "10th A",
-    teacherName: "Ms. Hina Fatima",
-    totalStudents: 35,
-    present: 33,
-    absents: 2,
-    attendance: 94.2,
-  },
-  {
-    className: "6th D",
-    teacherName: "Mr. Ali Raza",
-    totalStudents: 25,
-    present: 24,
-    absents: 1,
-    attendance: 96,
-  },
-];
 export default function ClassOverview() {
+  const { classes, loading: principalLoading } = usePrincipal();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [summaries, setSummaries] = useState<ClassSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAllSummaries = useCallback(async () => {
+    try {
+      if (!classes || classes.length === 0) return;
+      setLoading(true);
+
+      const results = await Promise.all(
+        classes.map(async (className) => {
+          const summary = await getAttendanceSummary(className, selectedDate);
+          const totalStudents = await getStudentCount(className);
+          return {
+            className: summary.className,
+            teacherName: "-", // optional
+            totalStudents,
+            present: summary.present,
+            absents: summary.absent,
+            attendance: summary.rate,
+          };
+        }),
+      );
+      setSummaries(results);
+    } catch (err) {
+      console.error("Error fetching class summaries:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [classes, selectedDate]);
+
+  useEffect(() => {
+    if (!principalLoading) fetchAllSummaries();
+  }, [fetchAllSummaries, principalLoading]);
+
+  const onChangeDate = (event: any, date?: Date) => {
+    setShowDatePicker(false);
+    if (date) setSelectedDate(date);
+  };
+
   return (
-    <SafeAreaView className="flex-1">
+    <SafeAreaView className="flex-1 bg-gray-100">
+      {/* Header */}
       <Header title="Class Overview" />
-      <FlatList
-        data={classes}
-        keyExtractor={(item) => item.className}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => <ClassCard item={item} />}
-      />
+
+      {/* Date Picker */}
+      <View className="px-4 mt-2">
+        <Pressable
+          onPress={() => setShowDatePicker(true)}
+          className="bg-white p-3 rounded-xl flex-row justify-between items-center shadow"
+        >
+          <Text className="text-lg font-semibold">
+            {selectedDate.toDateString()}
+          </Text>
+          <Feather name="calendar" size={22} color="gray" />
+        </Pressable>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            maximumDate={new Date()}
+            onChange={onChangeDate}
+          />
+        )}
+      </View>
+
+      {/* List */}
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text className="mt-2 text-gray-500">Loading attendance...</Text>
+        </View>
+      ) : summaries.length === 0 ? (
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-gray-500 text-lg">
+            No data available for this date.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={summaries}
+          keyExtractor={(item) => item.className}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 10, paddingBottom: 30 }}
+          renderItem={({ item }) => <ClassCard item={item} />}
+          ItemSeparatorComponent={() => <View className="h-2" />}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 type ClassCardProps = {
-  item: ClassInfo;
+  item: ClassSummary;
 };
 
 function ClassCard({ item }: ClassCardProps) {
@@ -76,27 +129,43 @@ function ClassCard({ item }: ClassCardProps) {
     <View className="p-2">
       <View className="bg-white rounded-xl p-4 shadow-lg">
         <Text className="text-xl font-bold mb-1">{item.className}</Text>
-        <Text className="text-gray-700 mb-2">Teacher: {item.teacherName}</Text>
+        <Text className="text-gray-700 mb-2">
+          Teacher: {item.teacherName || "N/A"}
+        </Text>
 
         <View className="flex-row justify-between">
           <View>
-            <Text className="text-gray-600">Total Students</Text>
+            <Text className="text-gray-600">Total</Text>
             <Text className="text-lg font-semibold">{item.totalStudents}</Text>
           </View>
 
           <View>
             <Text className="text-gray-600">Present</Text>
-            <Text className="text-lg font-semibold">{item.present}</Text>
+            <Text className="text-lg font-semibold text-green-600">
+              {item.present}
+            </Text>
           </View>
 
           <View>
-            <Text className="text-gray-600">Absents</Text>
-            <Text className="text-lg font-semibold">{item.absents}</Text>
+            <Text className="text-gray-600">Absent</Text>
+            <Text className="text-lg font-semibold text-red-600">
+              {item.absents}
+            </Text>
           </View>
 
           <View>
-            <Text className="text-gray-600">Attendance</Text>
-            <Text className="text-lg font-semibold">{item.attendance}%</Text>
+            <Text className="text-gray-600">Rate</Text>
+            <Text
+              className={`text-lg font-semibold ${
+                item.attendance >= 90
+                  ? "text-green-600"
+                  : item.attendance >= 75
+                    ? "text-yellow-600"
+                    : "text-red-600"
+              }`}
+            >
+              {item.attendance}%
+            </Text>
           </View>
         </View>
       </View>

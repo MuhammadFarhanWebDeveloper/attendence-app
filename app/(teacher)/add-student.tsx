@@ -15,17 +15,17 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc } from "firebase/firestore";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTeacher } from "@/context/TeacherContext";
 
 export default function AddStudent() {
   const router = useRouter();
-
+  const { refreshStudents } = useTeacher();
   const [fullName, setFullName] = useState("");
   const [fathername, setFathername] = useState("");
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const className = "7th B";
+  const { assignedClass } = useTeacher();
 
   const handleAddStudent = async () => {
     setSubmitting(true);
@@ -35,34 +35,49 @@ export default function AddStudent() {
         return;
       }
 
-      const phoneRegex = /^[0-9]{10}$/;
-      if (!phoneRegex.test(phone)) {
-        Alert.alert("Error", "Please enter a valid 10-digit phone number");
+      let formattedPhone = phone.trim().replace(/\s|-/g, ""); // remove spaces/dashes
+
+      // If starts with 0 → replace with +92
+      if (formattedPhone.startsWith("0")) {
+        formattedPhone = "+92" + formattedPhone.slice(1);
+      }
+      // If starts directly with 3 (like 3158772506)
+      else if (formattedPhone.startsWith("3")) {
+        formattedPhone = "+92" + formattedPhone;
+      }
+
+      // If already has +92, keep it
+      else if (!formattedPhone.startsWith("+92")) {
+        Alert.alert(
+          "Invalid Number",
+          "Phone number must start with 03, 3, or +92.",
+        );
+        return;
+      }
+
+      // Validate format strictly now
+      const pakistaniRegex = /^\+923[0-9]{9}$/; // e.g. +923158772506
+
+      if (!pakistaniRegex.test(formattedPhone)) {
+        Alert.alert(
+          "Invalid Number",
+          "Please enter a valid Pakistani phone number.",
+        );
         return;
       }
 
       const newStudentRef = doc(collection(db, "students"));
       const newStudentData = {
         id: newStudentRef.id,
-        name: fullName,
-        fathername,
-        phone,
-        class: className,
+        name: fullName.trim(),
+        fathername: fathername.trim(),
+        phone: formattedPhone,
+        class: assignedClass,
         createdAt: new Date().toISOString(),
       };
 
       await setDoc(newStudentRef, newStudentData);
-
-      (async () => {
-        try {
-          const existing = await AsyncStorage.getItem("students");
-          const students = existing ? JSON.parse(existing) : [];
-          students.push(newStudentData);
-          await AsyncStorage.setItem("students", JSON.stringify(students));
-        } catch (err) {
-          console.warn("Failed to update AsyncStorage:", err);
-        }
-      })();
+      await refreshStudents();
 
       Alert.alert("Success", "Student added successfully!");
       router.back();
@@ -73,7 +88,6 @@ export default function AddStudent() {
       setSubmitting(false);
     }
   };
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}

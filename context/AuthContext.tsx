@@ -1,62 +1,73 @@
 import React, { createContext, useEffect, useState, ReactNode } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { useRouter, useSegments } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doc, getDoc } from "firebase/firestore";
+
+type Role = "Teacher" | "Principal" | null;
 
 type AuthContextType = {
   user: User | null;
+  role: Role;
   loading: boolean;
 };
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  role: null,
   loading: true,
 });
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<Role>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const segments = useSegments();
+  const segment = useSegments();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         setUser(null);
+        setRole(null);
         setLoading(false);
-
-        if (segments[0] !== "sign-in") {
-          router.replace("/sign-in");
-        }
         return;
       }
 
       setUser(currentUser);
 
       try {
-        const [teacherData, principalData] = await Promise.all([
-          AsyncStorage.getItem("@teacher_info"),
-          AsyncStorage.getItem("@principal_info"),
-        ]);
+        const uid = currentUser.uid;
+        const usersDoc = await getDoc(doc(db, "users", uid));
 
-        const currentGroup = segments[0];
+        if (!usersDoc.exists()) {
+          await auth.signOut();
+          return;
+        }
 
-        if (teacherData && currentGroup !== "(teacher)") {
+        const data = usersDoc.data();
+        const userRole = (data.role as Role) || null;
+        setRole(userRole);
+
+        if (userRole) {
+          await AsyncStorage.setItem("@user_role", userRole);
+        }
+
+        console.log("Detected role:", userRole);
+
+        // Redirect logic
+        if (userRole === "Teacher" && !segment[0]?.startsWith("(teacher)")) {
           router.replace("/(teacher)");
-        } else if (principalData && currentGroup !== "(principal)") {
-          router.replace("/(principal)");
         } else if (
-          !teacherData &&
-          !principalData &&
-          currentGroup !== "(auth)"
+          userRole === "Principal" &&
+          !segment[0]?.startsWith("(principal)")
         ) {
-          router.replace("/sign-in");
+          router.replace("/(principal)");
         }
       } catch (err) {
-        console.log("Error reading role from AsyncStorage:", err);
-        router.replace("/sign-in");
+        console.error("Error fetching user role:", err);
       } finally {
         setLoading(false);
       }
@@ -74,7 +85,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, role, loading }}>
       {children}
     </AuthContext.Provider>
   );

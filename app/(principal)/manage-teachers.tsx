@@ -2,68 +2,130 @@ import Badge from "@/components/badge";
 import { db } from "@/lib/firebase";
 import Feather from "@expo/vector-icons/Feather";
 import { useRouter } from "expo-router";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, TextInput, FlatList } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  FlatList,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type Teacher = {
-  id?: string;
+// Teacher type
+interface Teacher {
+  id: string;
   class: string;
   createdAt: string;
   email: string;
   name: string;
   phone: string;
   role: "Teacher";
-};
+}
 
-async function fetchTeachers() {
+// Fetch teachers from Firebase
+async function fetchTeachers(): Promise<Teacher[]> {
   try {
     const usersCol = collection(db, "users");
     const q = query(usersCol, where("role", "==", "Teacher"));
     const querySnapshot = await getDocs(q);
-    const teachers: Teacher[] = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Teacher),
-    }));
-    return teachers;
+
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data() as Omit<Teacher, "id">; // remove 'id' from doc data
+      return { id: doc.id, ...data }; // add Firestore id manually
+    });
   } catch (error) {
     console.error("Error fetching teachers:", error);
+    return [];
   }
 }
 
 export default function ManageClasses() {
   const router = useRouter();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Load teachers from cache or Firebase
+  const loadTeachers = async () => {
+    setLoading(true);
+    try {
+      const cachedData = await AsyncStorage.getItem("teachers");
+      if (cachedData) setTeachers(JSON.parse(cachedData));
+
+      const teachersData = await fetchTeachers();
+      if (teachersData) {
+        setTeachers(teachersData);
+        await AsyncStorage.setItem("teachers", JSON.stringify(teachersData));
+      }
+    } catch (error) {
+      console.error("Failed to fetch teachers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      const cachedData = await AsyncStorage.getItem("teachers");
-      if (cachedData) {
-        setTeachers(JSON.parse(cachedData));
-      }
-
-      try {
-        const teachersData = await fetchTeachers();
-        if (teachersData) {
-          setTeachers(teachersData);
-          await AsyncStorage.setItem("teachers", JSON.stringify(teachersData));
-        }
-      } catch (error) {
-        console.error("Failed to fetch teachers from Firebase:", error);
-      }
-    })();
+    loadTeachers();
   }, []);
+
+  // Delete teacher function
+  const handleDelete = async (id: string) => {
+    Alert.alert(
+      "Delete Teacher",
+      "Are you sure you want to delete this teacher?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeletingId(id);
+              await deleteDoc(doc(db, "users", id));
+              await loadTeachers();
+            } catch (error) {
+              console.error("Failed to delete teacher:", error);
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Filter teachers based on search query
+  const filteredTeachers = teachers.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      t.name.toLowerCase().includes(q) ||
+      t.class.toLowerCase().includes(q) ||
+      t.email.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
       <FlatList
-        data={teachers}
-        keyExtractor={(item, index) => index.toString()}
+        data={filteredTeachers}
+        keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {}
+            {/* Header */}
             <View className="bg-primary px-5 p-3 pb-10">
               <View className="flex-row gap-3 items-center py-5">
                 <Pressable
@@ -76,18 +138,24 @@ export default function ManageClasses() {
                   Manage Teachers
                 </Text>
               </View>
-              {}
+
+              {/* Search Bar */}
               <View className="bg-white rounded-xl flex-row h-[45px] px-3 gap-2 items-center">
                 <Feather name="search" size={24} color="gray" />
                 <TextInput
                   className="flex-1 text-xl h-full"
                   placeholder="Search teachers or classes..."
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                 />
               </View>
             </View>
 
+            {/* Top actions */}
             <View className="flex-row justify-between px-5 p-3 items-center">
-              <Text className="text-xl">{teachers.length} Teachers</Text>
+              <Text className="text-xl">
+                {filteredTeachers.length} Teachers
+              </Text>
               <Pressable
                 onPress={() => router.push("/add-teacher")}
                 className="bg-primary flex-row p-2 rounded-xl items-center gap-2"
@@ -98,31 +166,49 @@ export default function ManageClasses() {
             </View>
           </>
         }
-        renderItem={({ item }) => <TeacherCard item={item} />}
+        renderItem={({ item }) => (
+          <TeacherCard
+            item={item}
+            onDelete={handleDelete}
+            isDeleting={deletingId === item.id}
+          />
+        )}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
+      {loading && (
+        <ActivityIndicator
+          size="large"
+          color="blue"
+          style={{ position: "absolute", top: "60%", left: "50%" }}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 type TeacherCardProps = {
   item: Teacher;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
 };
 
-function TeacherCard({ item }: TeacherCardProps) {
-  const onDelete = () => {};
-
+function TeacherCard({ item, onDelete, isDeleting }: TeacherCardProps) {
   return (
     <View className="py-3 px-5">
       <View className="p-3 gap-3 bg-white rounded-xl shadow-lg">
         <View className="flex-row items-center justify-between">
           <Text className="text-xl">{item.name}</Text>
           <View className="flex-row gap-2 items-center">
-            <View className="rounded-xl bg-blue-100 p-2">
-              <Feather name="edit" size={24} color="blue" />
-            </View>
-            <Pressable className="rounded-xl bg-red-100 p-2">
-              <Feather name="trash-2" size={24} color="red" />
+            <Pressable
+              className="rounded-xl bg-red-100 p-2"
+              disabled={isDeleting}
+              onPress={() => onDelete(item.id)}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="red" />
+              ) : (
+                <Feather name="trash-2" size={24} color="red" />
+              )}
             </Pressable>
           </View>
         </View>

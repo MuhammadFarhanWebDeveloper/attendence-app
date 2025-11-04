@@ -26,18 +26,44 @@ export default function AddTeacher() {
   const [password, setPassword] = useState("");
   const [className, setClassName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
   const handleAddTeacher = async () => {
     setSubmitting(true);
     try {
-      if (!fullName || !phone || !className) {
+      if (!fullName || !phone || !className || !email || !password) {
         Alert.alert("Error", "Please fill all fields");
         return;
       }
-      const phoneRegex = /^[0-9]{10}$/;
-      if (!phoneRegex.test(phone)) {
-        Alert.alert("Error", "Please enter a valid 10-digit phone number");
+
+      // Normalize phone number
+      let formattedPhone = phone.trim().replace(/\s|-/g, "");
+
+      // Convert starting 0 → +92
+      if (formattedPhone.startsWith("0")) {
+        formattedPhone = "+92" + formattedPhone.slice(1);
+      }
+      // If starts with 3 → +92 prefix
+      else if (formattedPhone.startsWith("3")) {
+        formattedPhone = "+92" + formattedPhone;
+      }
+      // Must start with +92 now
+      else if (!formattedPhone.startsWith("+92")) {
+        Alert.alert(
+          "Invalid Number",
+          "Phone number must start with 03, 3, or +92.",
+        );
         return;
       }
+
+      const pakistaniRegex = /^\+923[0-9]{9}$/;
+      if (!pakistaniRegex.test(formattedPhone)) {
+        Alert.alert(
+          "Invalid Number",
+          "Please enter a valid Pakistani phone number.",
+        );
+        return;
+      }
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -47,21 +73,22 @@ export default function AddTeacher() {
 
       await setDoc(doc(db, "users", uid), {
         email,
-        role: "Teacher", // 'teacher' or 'principal'
-        name: fullName,
-        phone,
-        class: className,
-        createdAt: new Date(),
+        role: "Teacher",
+        name: fullName.trim(),
+        phone: formattedPhone,
+        class: className.trim(),
+        createdAt: new Date().toISOString(),
       });
+
       Alert.alert("Success", "Teacher added successfully!");
-      router.back(); // Go back to Manage Teachers screen
+      router.back();
     } catch (error) {
+      console.error(error);
       Alert.alert("Error", "Something went wrong");
     } finally {
       setSubmitting(false);
     }
   };
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
