@@ -57,7 +57,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
         console.log("Detected role:", userRole);
 
-        // Redirect logic
         if (userRole === "Teacher" && !segment[0]?.startsWith("(teacher)")) {
           router.replace("/(teacher)");
         } else if (

@@ -23,18 +23,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Teacher type
-interface Teacher {
-  id: string;
-  class: string;
-  createdAt: string;
-  email: string;
-  name: string;
-  phone: string;
-  role: "Teacher";
-}
-
-// Fetch teachers from Firebase
 async function fetchTeachers(): Promise<Teacher[]> {
   try {
     const usersCol = collection(db, "users");
@@ -42,8 +30,8 @@ async function fetchTeachers(): Promise<Teacher[]> {
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map((doc) => {
-      const data = doc.data() as Omit<Teacher, "id">; // remove 'id' from doc data
-      return { id: doc.id, ...data }; // add Firestore id manually
+      const data = doc.data() as Omit<Teacher, "id">;
+      return { id: doc.id, ...data };
     });
   } catch (error) {
     console.error("Error fetching teachers:", error);
@@ -58,7 +46,6 @@ export default function ManageClasses() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Load teachers from cache or Firebase
   const loadTeachers = async () => {
     setLoading(true);
     try {
@@ -81,7 +68,6 @@ export default function ManageClasses() {
     loadTeachers();
   }, []);
 
-  // Delete teacher function
   const handleDelete = async (id: string) => {
     Alert.alert(
       "Delete Teacher",
@@ -107,7 +93,6 @@ export default function ManageClasses() {
     );
   };
 
-  // Filter teachers based on search query
   const filteredTeachers = teachers.filter((t) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -125,7 +110,6 @@ export default function ManageClasses() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {/* Header */}
             <View className="bg-primary px-5 p-3 pb-10">
               <View className="flex-row gap-3 items-center py-5">
                 <Pressable

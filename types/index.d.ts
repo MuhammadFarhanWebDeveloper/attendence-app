@@ -18,18 +18,17 @@ declare global {
     role: "Teacher";
   }
   type AttendanceStatus = "present" | "absent";
-
   interface AttendenceStudent extends Student {
     status: AttendanceStatus;
-    date: string; // yyyy-mm-dd
+    date: string;
   }
   interface AttendanceQueryOptions {
-    className?: string; // Filter by class
-    month?: number; // Month number 1-12
-    weekStart?: Date; // Start of week
-    weekEnd?: Date; // End of week
-    specificDay?: Date; // Fetch a specific day
-    latest?: boolean; // Fetch latest record
+    className?: string;
+    month?: number;
+    weekStart?: Date;
+    weekEnd?: Date;
+    specificDay?: Date;
+    latest?: boolean;
   }
 
   interface AttendanceRecord {
@@ -49,6 +48,11 @@ declare global {
     total: number;
     present: number;
     absent: number;
-    rate: number; // percentage
+    rate: number;
+  }
+  interface AcademicMonth {
+    month: number;
+    label: string;
+    year: number;
   }
 }

@@ -25,19 +25,15 @@ export default function LogoutButton() {
             const auth = getAuth();
 
             try {
-              // 1️⃣ Clear AsyncStorage (remove cached user role/info)
               await AsyncStorage.clear();
 
-              // 2️⃣ Sign out from Firebase
               await signOut(auth);
 
-              // 3️⃣ Show success alert
               Alert.alert(
                 "Logged Out",
                 "You have been signed out successfully.",
               );
 
-              // 4️⃣ Navigate to sign-in page
               router.replace("/sign-in");
             } catch (error) {
               console.error("Logout error:", error);

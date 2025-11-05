@@ -35,19 +35,13 @@ export default function AddStudent() {
         return;
       }
 
-      let formattedPhone = phone.trim().replace(/\s|-/g, ""); // remove spaces/dashes
+      let formattedPhone = phone.trim().replace(/\s|-/g, "");
 
-      // If starts with 0 → replace with +92
       if (formattedPhone.startsWith("0")) {
         formattedPhone = "+92" + formattedPhone.slice(1);
-      }
-      // If starts directly with 3 (like 3158772506)
-      else if (formattedPhone.startsWith("3")) {
+      } else if (formattedPhone.startsWith("3")) {
         formattedPhone = "+92" + formattedPhone;
-      }
-
-      // If already has +92, keep it
-      else if (!formattedPhone.startsWith("+92")) {
+      } else if (!formattedPhone.startsWith("+92")) {
         Alert.alert(
           "Invalid Number",
           "Phone number must start with 03, 3, or +92.",
@@ -55,8 +49,7 @@ export default function AddStudent() {
         return;
       }
 
-      // Validate format strictly now
-      const pakistaniRegex = /^\+923[0-9]{9}$/; // e.g. +923158772506
+      const pakistaniRegex = /^\+923[0-9]{9}$/;
 
       if (!pakistaniRegex.test(formattedPhone)) {
         Alert.alert(

@@ -25,8 +25,6 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Persisted login check
-
   const handleSignIn = async () => {
     if (!email || !password) {
       Alert.alert("Error", "Please enter email and password");

@@ -41,7 +41,7 @@ export default function ClassOverview() {
           const totalStudents = await getStudentCount(className);
           return {
             className: summary.className,
-            teacherName: "-", // optional
+            teacherName: "-",
             totalStudents,
             present: summary.present,
             absents: summary.absent,

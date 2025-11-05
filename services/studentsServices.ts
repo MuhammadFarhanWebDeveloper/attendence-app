@@ -13,7 +13,6 @@ export async function fetchStudents(className?: string): Promise<Student[]> {
   try {
     const studentsCol = collection(db, "students");
 
-    // Build query: if className is provided, filter by class
     const q = className
       ? query(studentsCol, where("class", "==", className))
       : studentsCol;

@@ -1,4 +1,3 @@
-// components/ProtectedRoute.tsx
 import { useEffect, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
@@ -19,7 +18,7 @@ export default function ProtectedRoute({ children }: Props) {
       if (user) {
         setLoggedIn(true);
       } else {
-        router.replace("/(auth)/sign-in"); // redirect if not logged in
+        router.replace("/(auth)/sign-in");
       }
       setLoading(false);
     });

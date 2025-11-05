@@ -35,19 +35,13 @@ export default function AddTeacher() {
         return;
       }
 
-      // Normalize phone number
       let formattedPhone = phone.trim().replace(/\s|-/g, "");
 
-      // Convert starting 0 → +92
       if (formattedPhone.startsWith("0")) {
         formattedPhone = "+92" + formattedPhone.slice(1);
-      }
-      // If starts with 3 → +92 prefix
-      else if (formattedPhone.startsWith("3")) {
+      } else if (formattedPhone.startsWith("3")) {
         formattedPhone = "+92" + formattedPhone;
-      }
-      // Must start with +92 now
-      else if (!formattedPhone.startsWith("+92")) {
+      } else if (!formattedPhone.startsWith("+92")) {
         Alert.alert(
           "Invalid Number",
           "Phone number must start with 03, 3, or +92.",

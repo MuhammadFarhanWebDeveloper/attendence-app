@@ -49,7 +49,6 @@ export function TeacherProvider({ children }: { children: ReactNode }) {
           await fetchAndSetTeacherClass();
         }
 
-        // Load cached students
         const cachedData = await AsyncStorage.getItem("students");
         if (cachedData) {
           setStudents(JSON.parse(cachedData));

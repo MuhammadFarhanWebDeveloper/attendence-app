@@ -18,7 +18,7 @@ type PrincipalContextType = {
   absentToday: number;
   attendanceTakenToday: boolean;
   attendanceRate: number;
-  classes: string[]; // 👈 all class names
+  classes: string[];
   loading: boolean;
   refreshPrincipalInfo: () => Promise<void>;
   refreshClasses: () => Promise<void>;
@@ -40,7 +40,6 @@ export function PrincipalProvider({ children }: Props) {
   const [classes, setClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🧠 Fetch initial data
   useEffect(() => {
     (async () => {
       await Promise.all([fetchAndSetPrincipalName(), refreshClasses()]);
@@ -48,7 +47,6 @@ export function PrincipalProvider({ children }: Props) {
     })();
   }, []);
 
-  // 🔹 Fetch principal info (from AsyncStorage)
   const fetchAndSetPrincipalName = async () => {
     try {
       const info = await AsyncStorage.getItem("@principal_info");
@@ -63,7 +61,6 @@ export function PrincipalProvider({ children }: Props) {
     }
   };
 
-  // 🔹 Fetch and store class names
   const refreshClasses = async () => {
     try {
       const cached = await AsyncStorage.getItem("@classes");
@@ -85,7 +82,6 @@ export function PrincipalProvider({ children }: Props) {
     }
   };
 
-  // 🔹 Refresh attendance summary and student stats
   const refreshPrincipalInfo = async () => {
     try {
       setLoading(true);

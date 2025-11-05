@@ -23,7 +23,6 @@ export default function ViewHistoryScreen() {
 
   const { assignedClass } = useTeacher();
 
-  // Fetch attendance when selectedDate or assignedClass changes
   useEffect(() => {
     if (!assignedClass) return;
 

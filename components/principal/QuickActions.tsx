@@ -26,7 +26,7 @@ export default function QuickActions() {
           icon={<Feather name="clipboard" size={20} color="red" />}
         />
         <Card
-          link="./(principal)/manage-teachers"
+          link="./(principal)/reports"
           icon_bg_color="bg-purple-50"
           title="Reports"
           icon={<Feather name="file-text" size={20} color="purple" />}

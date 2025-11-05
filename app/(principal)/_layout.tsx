@@ -9,8 +9,9 @@ export default function Principal() {
   const { user, loading, role } = useContext(AuthContext);
 
   if (loading) {
-    return null; // or a loading spinner
+    return null;
   }
+
   if (!user) {
     return <Redirect href="/sign-in" />;
   }

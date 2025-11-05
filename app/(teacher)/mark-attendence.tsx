@@ -41,7 +41,7 @@ export default function MarkAttendanceScreen() {
     initialStudents.map((s) => ({
       ...s,
       status: "present",
-      date: new Date().toISOString().split("T")[0], // yyyy-mm-dd
+      date: new Date().toISOString().split("T")[0],
     })),
   );
   const handleSubmitAttendance = async () => {
@@ -57,7 +57,7 @@ export default function MarkAttendanceScreen() {
       alert("Attendance submitted successfully!");
 
       router.replace("/");
-      // Reset all statuses
+
       setStudents((prev) => prev.map((s) => ({ ...s, status: "present" })));
     } catch (err: any) {
       console.error(err);

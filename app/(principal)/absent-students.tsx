@@ -16,7 +16,6 @@ import { useRouter } from "expo-router";
 import Badge from "@/components/badge";
 import { getAttendance } from "@/services/attendenceServices";
 
-// 🧠 MEMOIZED HEADER COMPONENT
 const AbsentHeader = React.memo(
   ({
     router,

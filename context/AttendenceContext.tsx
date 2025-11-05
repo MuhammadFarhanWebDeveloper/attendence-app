@@ -17,7 +17,6 @@ interface AttendanceContextValue {
   refreshAttendance: () => Promise<void>;
 }
 
-// Default context value
 const AttendanceContext = createContext<AttendanceContextValue>({
   todayRecord: [],
   presentCount: 0,
@@ -85,7 +84,6 @@ export const AttendanceProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Custom hook
 export const useAttendance = () => {
   const context = useContext(AttendanceContext);
   if (!context)

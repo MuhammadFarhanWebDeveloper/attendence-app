@@ -8,10 +8,12 @@ export default function Index() {
   return (
     <SafeAreaView className="h-full">
       <ScrollView>
-        <View className="gap-4">
+        <View className="gap-4 ">
           <WelcomePrincipal />
           <QuickActions />
-          <LogoutButton />
+          <View className="px-4">
+            <LogoutButton />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
