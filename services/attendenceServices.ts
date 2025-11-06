@@ -3,16 +3,15 @@ import {
   collection,
   doc,
   onSnapshot,
-  setDoc,
   query,
   where,
   getDocs,
   getCountFromServer,
+  increment,
+  writeBatch,
 } from "firebase/firestore";
 import { sendUrduGroupMessage } from "./sendMessage";
-/**
- * Submit attendance: stores one document per student per day
- */
+
 export async function submitAttendance(
   className: string,
   students: AttendenceStudent[],
@@ -22,29 +21,63 @@ export async function submitAttendance(
 
     const today = new Date();
     const dateString = today.toISOString().split("T")[0];
-    const attendanceCollection = collection(db, "attendance");
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
 
-    const promises = students.map((student) => {
-      const { id, ...rest } = student;
-      return setDoc(doc(attendanceCollection), {
-        ...rest,
-        studentId: id,
+    const attendanceCollection = collection(db, "attendance");
+    const studentStatsCollection = collection(db, "studentStats");
+
+    const attendanceBatch = writeBatch(db);
+
+    students.forEach((student) => {
+      const attendanceRef = doc(attendanceCollection);
+      attendanceBatch.set(attendanceRef, {
+        ...student,
+        studentId: student.id,
         class: className,
         date: dateString,
         createdAt: new Date(),
       });
     });
 
-    await Promise.all(promises);
+    await attendanceBatch.commit();
+    console.log("✅ Attendance records saved!");
 
-    console.log("Attendance submitted for all students!");
+    const summaryBatch = writeBatch(db);
+
+    students.forEach((student) => {
+      const summaryRef = doc(
+        studentStatsCollection,
+        `${student.id}_${year}_${month}`,
+      );
+
+      summaryBatch.set(
+        summaryRef,
+        {
+          studentId: student.id,
+          name: student.name,
+          fathername: student.fathername,
+          className: className,
+          phone: student.phone || "",
+          month,
+          year,
+          totalDays: increment(1),
+          present: increment(student.status === "present" ? 1 : 0),
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      );
+    });
+
+    await summaryBatch.commit();
+    console.log(" Student summaries updated!");
+
     return true;
   } catch (error) {
-    console.error("Error submitting attendance:", error);
+    console.error("❌ Error submitting attendance:", error);
     throw error;
   }
 }
-
 export async function markAttendance(
   className: string,
   students: AttendenceStudent[],
@@ -111,7 +144,6 @@ export async function getAttendanceSummary(
 
     const absent = total - present;
     const rate = total === 0 ? 0 : Math.round((present / total) * 100);
-
     return {
       className: className ?? "All Classes",
       date: specificDay ? specificDay.toISOString().split("T")[0] : "All Time",
@@ -126,99 +158,64 @@ export async function getAttendanceSummary(
   }
 }
 
-export const listenToAttendanceRecords = (
-  className: string | undefined,
-  callback: (
-    records: AttendanceRecord[],
-    summary: { total: number; present: number; absent: number; rate: number },
-  ) => void,
-) => {
-  const today = new Date().toISOString().split("T")[0];
-  let attendanceQuery = query(
-    collection(db, "attendance"),
-    where("date", "==", today),
-  );
-
-  if (className) {
-    attendanceQuery = query(attendanceQuery, where("class", "==", className));
-  }
-
-  const unsubscribe = onSnapshot(attendanceQuery, (snapshot) => {
-    const records: AttendanceRecord[] = [];
-    let present = 0;
-
-    snapshot.forEach((doc) => {
-      const data = doc.data() as AttendanceRecord;
-
-      records.push(data);
-
-      if (data.status === "present") present++;
-    });
-
-    const total = records.length;
-    const absent = total - present;
-    const rate = total === 0 ? 0 : Math.round((present / total) * 100);
-
-    callback(records, { total, present, absent, rate });
-  });
-
-  return unsubscribe;
-};
-
 export async function getLowAttendanceStudents(
   month: number,
   year: number,
   className?: string,
-) {
-  const startOfMonth = new Date(year, month, 1);
-  const endOfMonth = new Date(year, month + 1, 0);
+): Promise<LowAttendanceStudent[]> {
+  try {
+    const statsRef = collection(db, "studentStats");
 
-  const startDate = startOfMonth.toISOString().split("T")[0];
-  const endDate = endOfMonth.toISOString().split("T")[0];
+    let q = query(
+      statsRef,
+      where("month", "==", month),
+      where("year", "==", year),
+    );
 
-  const attendanceRef = collection(db, "attendance");
-  let q = query(
-    attendanceRef,
-    where("date", ">=", startDate),
-    where("date", "<=", endDate),
-  );
+    if (className) {
+      q = query(q, where("className", "==", className));
+    }
 
-  if (className) {
-    q = query(q, where("class", "==", className));
+    const snapshot = await getDocs(q);
+    const results: LowAttendanceStudent[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data() as {
+        studentId: string;
+        name: string;
+        fathername: string;
+        className: string;
+        phone?: string;
+        totalDays?: number;
+        present?: number;
+        createdAt?: string;
+      };
+
+      const totalDays = data.totalDays || 0;
+      const present = data.present || 0;
+      const absent = totalDays - present;
+      const rate =
+        totalDays === 0 ? 0 : Math.round((present / totalDays) * 100);
+
+      if (rate < 75) {
+        results.push({
+          id: data.studentId,
+          name: data.name,
+          fathername: data.fathername,
+          class: data.className,
+          phone: data.phone || "",
+          createdAt: data.createdAt || new Date().toISOString(),
+          present,
+          absent,
+          attendanceRate: rate,
+        });
+      }
+    });
+
+    console.log(` Found ${results.length} students below 75% attendance.`);
+    return results;
+  } catch (error) {
+    console.error(" Error fetching low attendance students:", error);
+    throw error;
   }
-
-  const snapshot = await getDocs(q);
-  const records = snapshot.docs.map(
-    (d) => ({ id: d.id, ...d.data() }) as AttendanceRecord,
-  );
-
-  const grouped: Record<string, AttendanceRecord[]> = {};
-  for (const rec of records) {
-    if (!grouped[rec.studentId]) grouped[rec.studentId] = [];
-    grouped[rec.studentId].push(rec);
-  }
-
-  const results = Object.values(grouped).map((records) => {
-    const student = records[0];
-    const totalDays = records.length;
-    const present = records.filter((r) => r.status === "present").length;
-    const absent = totalDays - present;
-    const rate = Math.round((present / totalDays) * 100);
-
-    return {
-      id: student.studentId,
-      name: student.name,
-      fathername: student.fathername,
-      class: student.class,
-      phone: student.phone,
-      createdAt: student.createdAt,
-      totalDays,
-      present,
-      absent,
-      leaves: 0,
-      attendanceRate: rate,
-    };
-  });
-
-  return results.filter((r) => r.attendanceRate < 75);
 }

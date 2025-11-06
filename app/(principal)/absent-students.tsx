@@ -14,7 +14,8 @@ import Feather from "@expo/vector-icons/Feather";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import Badge from "@/components/badge";
-import { getAttendance } from "@/services/attendenceServices";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const AbsentHeader = React.memo(
   ({
@@ -44,7 +45,6 @@ const AbsentHeader = React.memo(
   }) => {
     return (
       <View className="bg-primary px-5 py-3 pb-10">
-        {/* Top Bar */}
         <View className="flex-row gap-3 items-center py-5">
           <Pressable
             className="w-10 h-10 rounded-full bg-white/20 items-center justify-center"
@@ -55,7 +55,6 @@ const AbsentHeader = React.memo(
           <Text className="text-2xl font-bold text-white">Absent Students</Text>
         </View>
 
-        {/* Search bar */}
         <View className="bg-white rounded-xl flex-row h-[45px] px-3 gap-2 items-center">
           <Feather name="search" size={24} color="gray" />
           <TextInput
@@ -66,7 +65,6 @@ const AbsentHeader = React.memo(
           />
         </View>
 
-        {/* Date picker */}
         <View className="mt-3">
           <Pressable
             className="bg-white rounded-lg p-3 flex-row justify-between items-center shadow"
@@ -77,6 +75,7 @@ const AbsentHeader = React.memo(
             </Text>
             <Feather name="calendar" size={24} color="gray" />
           </Pressable>
+
           {showDatePicker && (
             <DateTimePicker
               value={selectedDate}
@@ -88,7 +87,6 @@ const AbsentHeader = React.memo(
           )}
         </View>
 
-        {/* Class filter buttons */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -101,11 +99,7 @@ const AbsentHeader = React.memo(
             }`}
             onPress={() => setSelectedClass(null)}
           >
-            <Text
-              className={`font-medium ${
-                !selectedClass ? "text-black" : "text-white"
-              }`}
-            >
+            <Text className={!selectedClass ? "text-black" : "text-white"}>
               All Classes
             </Text>
           </Pressable>
@@ -119,9 +113,7 @@ const AbsentHeader = React.memo(
               onPress={() => setSelectedClass(cls)}
             >
               <Text
-                className={`font-medium ${
-                  selectedClass === cls ? "text-black" : "text-white"
-                }`}
+                className={selectedClass === cls ? "text-black" : "text-white"}
               >
                 {cls}
               </Text>
@@ -129,7 +121,6 @@ const AbsentHeader = React.memo(
           ))}
         </ScrollView>
 
-        {/* Absent count */}
         <View className="px-3 py-3">
           <Text className="text-lg font-semibold text-white">
             {absentCount} Students Absent
@@ -143,62 +134,70 @@ const AbsentHeader = React.memo(
 export default function AbsentStudents() {
   const router = useRouter();
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [absentStudents, setAbsentStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchAbsentStudents = useCallback(async () => {
-    try {
-      setLoading(true);
-      const options: AttendanceQueryOptions = {
-        specificDay: selectedDate,
-        className: selectedClass ?? undefined,
-      };
-      const records: AttendanceRecord[] = await getAttendance(options);
-      const absent: Student[] = records
-        .filter((r) => r.status === "absent")
-        .map((r) => ({
-          id: r.studentId,
-          name: r.name,
-          fathername: r.fathername,
-          class: r.class,
-          phone: r.phone,
-          createdAt: r.createdAt,
+  const fetchAbsentStudents = useCallback(() => {
+    setLoading(true);
+
+    const ref = collection(db, "attendance");
+    let q = query(ref);
+
+    if (selectedClass) {
+      q = query(q, where("class", "==", selectedClass));
+    }
+    if (selectedDate) {
+      const dateString = selectedDate.toISOString().split("T")[0];
+      q = query(q, where("date", "==", dateString));
+    }
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const absent: Student[] = snap.docs
+        .map((doc) => doc.data() as AttendanceRecord)
+        .filter((record) => record.status === "absent")
+        .map((record) => ({
+          id: record.studentId,
+          name: record.name,
+          fathername: record.fathername,
+          class: record.class,
+          phone: record.phone,
+          createdAt: record.createdAt,
         }));
 
       setAbsentStudents(absent);
       setClasses(Array.from(new Set(absent.map((s) => s.class))));
-    } catch (err) {
-      console.error("Error fetching absent students:", err);
-    } finally {
       setLoading(false);
-    }
-  }, [selectedDate, selectedClass]);
+    });
+
+    return unsubscribe;
+  }, [selectedClass, selectedDate]);
 
   useEffect(() => {
-    fetchAbsentStudents();
+    const unsub = fetchAbsentStudents();
+    return () => unsub();
   }, [fetchAbsentStudents]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
+    const t = setTimeout(() => {
       setFilteredStudents(
         absentStudents.filter(
           (s) =>
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-            s.fathername.toLowerCase().includes(searchQuery.toLowerCase()) &&
+            (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              s.fathername.toLowerCase().includes(searchQuery.toLowerCase())) &&
             (selectedClass ? s.class === selectedClass : true),
         ),
       );
     }, 200);
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(t);
   }, [searchQuery, selectedClass, absentStudents]);
 
-  const onChangeDate = useCallback((event: any, date?: Date) => {
+  const onChangeDate = useCallback((_: any, date?: Date) => {
     setShowDatePicker(Platform.OS === "ios");
     if (date) setSelectedDate(date);
   }, []);
@@ -208,8 +207,6 @@ export default function AbsentStudents() {
       <FlatList
         data={loading ? [] : filteredStudents}
         keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
         ListHeaderComponent={
           <AbsentHeader
             router={router}
@@ -227,6 +224,8 @@ export default function AbsentStudents() {
         }
         renderItem={({ item }) => (
           <Card
+            id={item.id}
+            createdAt={item.createdAt}
             name={item.name}
             fathername={item.fathername}
             class={item.class}
@@ -236,18 +235,14 @@ export default function AbsentStudents() {
         ItemSeparatorComponent={() => <View className="h-3" />}
         ListEmptyComponent={
           loading ? (
-            <View className="py-10 items-center justify-center">
-              <ActivityIndicator size="large" color="#2563eb" />
-              <Text className="text-gray-600 mt-3">
-                Loading absent students...
-              </Text>
+            <View className="py-10 items-center">
+              <ActivityIndicator size="large" />
+              <Text className="mt-2">Loading absent students...</Text>
             </View>
           ) : (
-            <View className="p-5">
-              <Text className="text-center text-gray-500 text-lg">
-                No absent students found for this date.
-              </Text>
-            </View>
+            <Text className="text-center text-gray-500 mt-6">
+              No absent students found for this date.
+            </Text>
           )
         }
       />
@@ -255,14 +250,7 @@ export default function AbsentStudents() {
   );
 }
 
-interface CardProps {
-  name: string;
-  fathername: string;
-  class: string;
-  phone: string;
-}
-
-function Card({ name, fathername, class: className, phone }: CardProps) {
+function Card({ name, fathername, class: className, phone }: Student) {
   return (
     <View className="px-5 py-2">
       <View className="rounded-xl bg-white p-3 shadow-lg">

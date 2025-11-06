@@ -12,14 +12,13 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { usePrincipal } from "@/context/PrincipalContext";
 import { getAttendanceSummary } from "@/services/attendenceServices";
 import Header from "@/components/Header";
-import { getStudentCount } from "@/services/classCache";
 
 type ClassSummary = {
   className: string;
   teacherName?: string;
   totalStudents: number;
   present: number;
-  absents: number;
+  absent: number;
   attendance: number;
 };
 
@@ -38,13 +37,12 @@ export default function ClassOverview() {
       const results = await Promise.all(
         classes.map(async (className) => {
           const summary = await getAttendanceSummary(className, selectedDate);
-          const totalStudents = await getStudentCount(className);
           return {
             className: summary.className,
             teacherName: "-",
-            totalStudents,
+            totalStudents: summary.total,
             present: summary.present,
-            absents: summary.absent,
+            absent: summary.absent, // ✅ fixed
             attendance: summary.rate,
           };
         }),
@@ -68,10 +66,8 @@ export default function ClassOverview() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
-      {/* Header */}
       <Header title="Class Overview" />
 
-      {/* Date Picker */}
       <View className="px-4 mt-2">
         <Pressable
           onPress={() => setShowDatePicker(true)}
@@ -94,7 +90,6 @@ export default function ClassOverview() {
         )}
       </View>
 
-      {/* List */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#2563eb" />
@@ -125,6 +120,7 @@ type ClassCardProps = {
 };
 
 function ClassCard({ item }: ClassCardProps) {
+  console.log(item);
   return (
     <View className="p-2">
       <View className="bg-white rounded-xl p-4 shadow-lg">
@@ -149,7 +145,7 @@ function ClassCard({ item }: ClassCardProps) {
           <View>
             <Text className="text-gray-600">Absent</Text>
             <Text className="text-lg font-semibold text-red-600">
-              {item.absents}
+              {item.absent}
             </Text>
           </View>
 

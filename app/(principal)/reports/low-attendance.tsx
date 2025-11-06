@@ -18,18 +18,8 @@ import { getLowAttendanceStudents } from "@/services/attendenceServices";
 export default function LowAttendanceStudents() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [students, setStudents] = useState<
-    (Student & {
-      attendanceRate: number;
-      totalDays: number;
-      present: number;
-      absent: number;
-      leaves: number;
-      createdAt: string;
-    })[]
-  >([]);
+  const [students, setStudents] = useState<LowAttendanceStudent[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<typeof students>([]);
-  const [totalDays, setTotalDays] = useState(0);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -80,7 +70,6 @@ export default function LowAttendanceStudents() {
     });
 
     setFilteredStudents(filtered);
-    setTotalDays(filtered[0]?.totalDays || 0);
   }, [selectedMonth, selectedClass, students]);
 
   const monthLabel = useMemo(() => {
@@ -207,14 +196,6 @@ export default function LowAttendanceStudents() {
             </ScrollView>
 
             {/* Summary */}
-            <View className="bg-white/20 mt-4 p-3 rounded-xl flex-row justify-between items-center">
-              <Text className="text-white text-base font-semibold">
-                Total Working Days
-              </Text>
-              <Text className="text-white text-lg font-bold">
-                {totalDays} Days
-              </Text>
-            </View>
 
             <Text className="text-white/90 text-lg mt-3">
               Students below 75% in {monthLabel}
@@ -234,17 +215,7 @@ export default function LowAttendanceStudents() {
   );
 }
 
-function StudentCard({
-  student,
-}: {
-  student: Student & {
-    attendanceRate: number;
-    totalDays: number;
-    present: number;
-    absent: number;
-    leaves: number;
-  };
-}) {
+function StudentCard({ student }: { student: LowAttendanceStudent }) {
   return (
     <View className="p-3">
       <View className="bg-white p-4 mb-4 rounded-xl shadow">
@@ -270,12 +241,6 @@ function StudentCard({
           <View className="flex-row justify-between mb-1">
             <Text className="text-gray-700 font-medium">Absent:</Text>
             <Text className="text-red-500 font-semibold">{student.absent}</Text>
-          </View>
-          <View className="flex-row justify-between">
-            <Text className="text-gray-700 font-medium">Leaves:</Text>
-            <Text className="text-yellow-600 font-semibold">
-              {student.leaves}
-            </Text>
           </View>
         </View>
       </View>

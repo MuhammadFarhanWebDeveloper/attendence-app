@@ -55,4 +55,10 @@ declare global {
     label: string;
     year: number;
   }
+  interface LowAttendanceStudent extends Student {
+    attendanceRate: number;
+    present: number;
+    absent: number;
+    createdAt: string;
+  }
 }
